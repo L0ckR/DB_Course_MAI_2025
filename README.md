@@ -31,9 +31,25 @@ docker compose exec backend python scripts/seed.py
 5) Open Swagger
 
 - `http://localhost:8000/docs`
+- Frontend: `http://localhost:3000`
 
 ## Notes
 
 - Audit triggers use `current_setting('app.user_id', true)`; set `X-User-Id` header in API requests to populate `changed_by`.
 - Batch import endpoint: `POST /api/batch-import` (supports `metrics` and `datasets`).
 - Performance demo SQL: `sql/perf_demo.sql`, paste output into `docs/perf_report.md`.
+
+## Frontend
+
+The frontend lives in `frontend/` and connects to the FastAPI backend.
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The default `VITE_API_URL=/api` keeps a single origin for Docker and local dev (Vite proxies `/api` to `http://localhost:8000`).
+Frontend dev reads the repo root `.env`, so there is only one env file for all services.
+
+Open `http://localhost:5173` and sign in using a user id from `/api/users`.

@@ -28,5 +28,16 @@ services:
       - ./scripts:/app/scripts
       - ./alembic.ini:/app/alembic.ini
 
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-/api}
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
+
 volumes:
   db_data:
