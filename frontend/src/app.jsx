@@ -34,137 +34,109 @@ export default function App() {
 }
 
 function LoginScreen({ onLogin }) {
-  const [userId, setUserId] = useState("");
-  const [users, setUsers] = useState([]);
-  const [emailQuery, setEmailQuery] = useState("");
-  const [loadingUsers, setLoadingUsers] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState({ state: "idle", message: "" });
 
-  const loadUsers = async () => {
-    setLoadingUsers(true);
+  const handleSubmit = async () => {
     setStatus({ state: "idle", message: "" });
-    try {
-      const data = await apiFetch("/users?limit=500");
-      setUsers(data);
-      setStatus({ state: "success", message: "Users loaded" });
-    } catch (err) {
-      setStatus({ state: "error", message: err.message });
-    } finally {
-      setLoadingUsers(false);
+    if (!email.trim() || !password.trim()) {
+      setStatus({ state: "error", message: "Email and password are required" });
+      return;
     }
-  };
-
-  const handleEmailLookup = () => {
-    const match = users.find((user) => user.email === emailQuery.trim());
-    if (match) {
-      setUserId(match.user_id);
-      setStatus({ state: "success", message: "User matched" });
-    } else {
-      setStatus({ state: "error", message: "No user found" });
-    }
-  };
-
-  const handleSelectUser = (event) => {
-    const selectedId = event.target.value;
-    setUserId(selectedId);
-  };
-
-  const handleLoginSubmit = () => {
-    if (!userId.trim()) {
-      setStatus({ state: "error", message: "User id is required" });
+    if (mode === "register" && !fullName.trim()) {
+      setStatus({ state: "error", message: "Full name is required" });
       return;
     }
 
-    const matched = users.find((user) => user.user_id === userId.trim());
-    onLogin({
-      user_id: userId.trim(),
-      email: matched?.email || "",
-      full_name: matched?.full_name || ""
-    });
+    setLoading(true);
+    try {
+      const payload =
+        mode === "login"
+          ? { email: email.trim(), password }
+          : { email: email.trim(), full_name: fullName.trim(), password };
+
+      const data = await apiFetch(`/auth/${mode}`, {
+        method: "POST",
+        body: JSON.stringify(payload)
+      });
+      onLogin({
+        user_id: data.user_id,
+        email: data.email,
+        full_name: data.full_name
+      });
+    } catch (err) {
+      setStatus({ state: "error", message: err.message });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const toggleMode = () => {
+    setMode((current) => (current === "login" ? "register" : "login"));
+    setStatus({ state: "idle", message: "" });
   };
 
   return (
     <div className="auth-shell">
-      <div className="auth-card">
-        <div className="auth-header">
-          <span className="eyebrow">RunAtlas</span>
-          <h1>ML runs, clean and audited.</h1>
-          <p>
-            Connect to your database-backed experiment store and unlock dashboards,
-            leaderboards, and audit trails in one place.
-          </p>
+      <div className="auth-card compact">
+        <div className="auth-header basic">
+          <div className="brand-row">
+            <span className="logo small">RA</span>
+            <div>
+              <h1>RunAtlas</h1>
+              <p>Sign in to your tracking workspace.</p>
+            </div>
+          </div>
         </div>
 
         <div className="auth-form">
+          {mode === "register" && (
+            <label className="field">
+              <span>Full name</span>
+              <input
+                type="text"
+                placeholder="Jane Doe"
+                value={fullName}
+                onChange={(event) => setFullName(event.target.value)}
+              />
+            </label>
+          )}
           <label className="field">
-            <span>User id</span>
+            <span>Email</span>
             <input
-              type="text"
-              placeholder="UUID from users"
-              value={userId}
-              onChange={(event) => setUserId(event.target.value)}
+              type="email"
+              placeholder="you@company.ai"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
             />
           </label>
 
-          <div className="field-row">
-            <label className="field">
-              <span>Email lookup</span>
-              <input
-                type="email"
-                placeholder="user@example.com"
-                value={emailQuery}
-                onChange={(event) => setEmailQuery(event.target.value)}
-              />
-            </label>
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={handleEmailLookup}
-              disabled={!users.length}
-            >
-              Find
-            </button>
-          </div>
+          <label className="field">
+            <span>Password</span>
+            <input
+              type="password"
+              placeholder="********"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
+          </label>
 
-          <div className="field-row">
-            <button
-              className="btn ghost"
-              type="button"
-              onClick={loadUsers}
-              disabled={loadingUsers}
-            >
-              {loadingUsers ? "Loading..." : "Load users"}
-            </button>
-            <select className="select" onChange={handleSelectUser} value={userId}>
-              <option value="">Pick a user</option>
-              {users.map((user) => (
-                <option key={user.user_id} value={user.user_id}>
-                  {user.full_name} · {user.email}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <button className="btn primary" type="button" onClick={handleLoginSubmit}>
-            Enter workspace
+          <button className="btn primary full" type="button" onClick={handleSubmit}>
+            {loading ? "Working..." : mode === "login" ? "Sign in" : "Create account"}
+          </button>
+          <button className="btn ghost full" type="button" onClick={toggleMode}>
+            {mode === "login"
+              ? "Create a new account"
+              : "Back to sign in"}
           </button>
           {status.message && (
             <div className={`status ${status.state}`}>{status.message}</div>
           )}
         </div>
-      </div>
-      <div className="auth-aside">
-        <div className="pill">Audit-ready</div>
-        <h2>Stay in control</h2>
-        <p>
-          Use the same X-User-Id header as the backend to keep audit trails
-          consistent. Every insert, update, and delete keeps a fingerprint.
-        </p>
-        <ul>
-          <li>Project quality dashboards in seconds</li>
-          <li>Leaderboard comparisons across runs</li>
-          <li>Batch import monitoring for metrics</li>
-        </ul>
       </div>
     </div>
   );

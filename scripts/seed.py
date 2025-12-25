@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import insert
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password
 from app.db.session import engine
 from app.models.models import (
     Artifact,
@@ -38,6 +39,7 @@ def _random_hash() -> str:
 
 def seed() -> None:
     random.seed(42)
+    default_password_hash = hash_password("demo123")
 
     with Session(engine) as db:
         metric_defs = [
@@ -78,7 +80,7 @@ def seed() -> None:
                 user_id=uuid.uuid4(),
                 email=_random_email(i),
                 full_name=_random_name(i),
-                password_hash=_random_hash(),
+                password_hash=default_password_hash,
                 is_active=True,
             )
             for i in range(1, 501)

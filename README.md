@@ -38,6 +38,11 @@ docker compose exec backend python scripts/seed.py
 - Audit triggers use `current_setting('app.user_id', true)`; set `X-User-Id` header in API requests to populate `changed_by`.
 - Batch import endpoint: `POST /api/batch-import` (supports `metrics` and `datasets`).
 - Performance demo SQL: `sql/perf_demo.sql`, paste output into `docs/perf_report.md`.
+- Integration notes (MLflow / scikit-learn): `docs/integration.md`.
+- Auth endpoints: `POST /api/auth/register`, `POST /api/auth/login`.
+  Seeded users use the password `demo123`.
+  Passwords are hashed with bcrypt via `passlib`.
+  Password length is limited to 72 bytes for bcrypt compatibility.
 
 ## Frontend
 
@@ -52,4 +57,4 @@ npm run dev
 The default `VITE_API_URL=/api` keeps a single origin for Docker and local dev (Vite proxies `/api` to `http://localhost:8000`).
 Frontend dev reads the repo root `.env`, so there is only one env file for all services.
 
-Open `http://localhost:5173` and sign in using a user id from `/api/users`.
+Open `http://localhost:5173` and sign in with email + password (or register).

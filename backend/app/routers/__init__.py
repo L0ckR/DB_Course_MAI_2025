@@ -1,5 +1,6 @@
 from app.routers import (
     artifacts,
+    auth,
     batch_import,
     dataset_versions,
     datasets,
@@ -14,6 +15,7 @@ from app.routers import (
 
 __all__ = [
     "artifacts",
+    "auth",
     "batch_import",
     "dataset_versions",
     "datasets",

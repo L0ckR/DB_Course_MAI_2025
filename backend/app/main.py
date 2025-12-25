@@ -3,6 +3,7 @@ from fastapi import FastAPI
 from app.core.config import settings
 from app.routers import (
     artifacts,
+    auth,
     batch_import,
     dataset_versions,
     datasets,
@@ -19,6 +20,7 @@ app = FastAPI(title=settings.app_name)
 
 api_prefix = settings.api_prefix
 app.include_router(users.router, prefix=api_prefix)
+app.include_router(auth.router, prefix=api_prefix)
 app.include_router(organizations.router, prefix=api_prefix)
 app.include_router(projects.router, prefix=api_prefix)
 app.include_router(datasets.router, prefix=api_prefix)

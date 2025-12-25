@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import hash_password, validate_password_length
 from app.db.deps import get_db
 from app.models.models import User
 from app.schemas.users import UserCreate, UserRead, UserUpdate
@@ -13,7 +14,16 @@ router = APIRouter(prefix="/users", tags=["users"])
 
 @router.post("", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def create_user(user_in: UserCreate, db: Session = Depends(get_db)) -> User:
-    user = User(**user_in.model_dump())
+    payload = user_in.model_dump()
+    password = payload.pop("password")
+    try:
+        validate_password_length(password)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        ) from exc
+    user = User(**payload, password_hash=hash_password(password))
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -43,8 +53,19 @@ def update_user(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    for key, value in user_in.model_dump(exclude_unset=True).items():
+    payload = user_in.model_dump(exclude_unset=True)
+    password = payload.pop("password", None)
+    for key, value in payload.items():
         setattr(user, key, value)
+    if password:
+        try:
+            validate_password_length(password)
+        except ValueError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=str(exc),
+            ) from exc
+        user.password_hash = hash_password(password)
     db.commit()
     db.refresh(user)
     return user

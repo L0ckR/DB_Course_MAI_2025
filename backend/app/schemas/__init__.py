@@ -1,4 +1,5 @@
 from app.schemas.artifacts import ArtifactCreate, ArtifactRead, ArtifactUpdate
+from app.schemas.auth import AuthLogin, AuthRegister, AuthSession
 from app.schemas.batch_import import BatchImportJobRead
 from app.schemas.datasets import (
     DatasetCreate,
@@ -30,6 +31,9 @@ __all__ = [
     "ArtifactCreate",
     "ArtifactRead",
     "ArtifactUpdate",
+    "AuthLogin",
+    "AuthRegister",
+    "AuthSession",
     "BatchImportJobRead",
     "DatasetCreate",
     "DatasetRead",

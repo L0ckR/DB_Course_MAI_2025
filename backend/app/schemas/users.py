@@ -9,13 +9,13 @@ from app.schemas.base import ORMBase
 class UserCreate(BaseModel):
     email: str
     full_name: str
-    password_hash: str
+    password: str
     is_active: bool = True
 
 
 class UserUpdate(BaseModel):
     full_name: str | None = None
-    password_hash: str | None = None
+    password: str | None = None
     is_active: bool | None = None
 
 
