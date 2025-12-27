@@ -37,8 +37,8 @@ docker compose exec backend python scripts/seed.py
 
 - Audit triggers use `current_setting('app.user_id', true)`; authenticated requests populate `changed_by` automatically.
 - Batch import endpoint: `POST /api/batch-import` (supports `metrics` and `datasets`).
-- Performance demo SQL: `sql/perf_demo.sql`, paste output into `docs/perf_report.md`.
-- Integration notes (MLflow / scikit-learn): `docs/integration.md`.
+- Performance demo SQL: `sql/perf_demo.sql`, results are included in `docs/report.tex`.
+- API usage example: `docs/api_usage.md`.
 - Coursework report (TeX): `docs/report.tex`.
 - Business queries: `sql/business_queries.sql`.
 - Auth endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/token` (OAuth2 password flow for Swagger).
@@ -47,6 +47,29 @@ docker compose exec backend python scripts/seed.py
   Passwords are hashed with bcrypt via `passlib`.
   Password length is limited to 72 bytes for bcrypt compatibility.
   Test user credentials come from `SEED_TEST_USER_EMAIL` / `SEED_TEST_USER_PASSWORD`.
+
+## API usage example
+
+Use values from `.env` (`SEED_TEST_USER_EMAIL` / `SEED_TEST_USER_PASSWORD`).
+
+```bash
+export API_URL=http://localhost:8000
+export API_EMAIL=your@email
+export API_PASSWORD=your_password
+export NO_PROXY=localhost,127.0.0.1
+
+TOKEN=$(curl -s -X POST "$API_URL/api/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=$API_EMAIL&password=$API_PASSWORD" | \
+  python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
+PROJECT_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/projects" | \
+  python3 -c "import sys, json; print(json.load(sys.stdin)[0]['project_id'])")
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/reports/projects/$PROJECT_ID/dashboard"
+```
 
 ## Frontend
 

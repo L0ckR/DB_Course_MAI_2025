@@ -64,9 +64,9 @@ def _load_rows(source_format: str, content: io.TextIOBase) -> list[dict]:
 
 @router.post("/batch-import", response_model=BatchImportJobRead)
 def batch_import(
-    job_type: str = Form(...),
-    format: str = Form(...),
-    source_uri: str | None = Form(None),
+    job_type: str = Form(..., example="metrics"),
+    format: str = Form(..., example="csv"),
+    source_uri: str | None = Form(None, example="uploads/metrics.csv"),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),

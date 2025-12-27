@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from sqlalchemy import insert, or_, select
 from sqlalchemy.orm import Session
 
@@ -166,7 +166,23 @@ def delete_run(
 @router.post("/{run_id}/metrics", response_model=list[RunMetricValueRead])
 def add_run_metrics(
     run_id: uuid.UUID,
-    metrics: list[RunMetricValueCreate],
+    metrics: list[RunMetricValueCreate] = Body(
+        ...,
+        example=[
+            {
+                "metric_key": "accuracy",
+                "scope": "val",
+                "step": 1,
+                "value": 0.92,
+            },
+            {
+                "metric_key": "loss",
+                "scope": "train",
+                "step": 1,
+                "value": 0.45,
+            },
+        ],
+    ),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[RunMetricValue]:
@@ -226,10 +242,10 @@ def add_run_metrics(
 @router.get("/{run_id}/metrics", response_model=list[RunMetricValueRead])
 def get_run_metrics(
     run_id: uuid.UUID,
-    metric_key: str | None = None,
-    scope: str | None = None,
-    from_step: int | None = Query(None, ge=0),
-    to_step: int | None = Query(None, ge=0),
+    metric_key: str | None = Query(None, example="accuracy"),
+    scope: str | None = Query(None, example="val"),
+    from_step: int | None = Query(None, ge=0, example=0),
+    to_step: int | None = Query(None, ge=0, example=50),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[RunMetricValue]:

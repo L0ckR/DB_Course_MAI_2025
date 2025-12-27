@@ -3,68 +3,83 @@
 
 \usepackage{fontspec}
 \usepackage{polyglossia}
-\setdefaultlanguage{russian}
 
-% Prefer Times New Roman for ГОСТ requirements; fall back if the font is missing.
-\IfFontExistsTF{Times New Roman}{
-  \setmainfont{Times New Roman}
-  \newfontfamily\cyrillicfont{Times New Roman}
-}{
-  \setmainfont{TeX Gyre Termes}
-  \IfFontExistsTF{PT Serif}{
-    \newfontfamily\cyrillicfont{PT Serif}
-  }{
-    \newfontfamily\cyrillicfont{DejaVu Serif}
-  }
-}
+% Use Times New Roman everywhere (ГОСТ requirement).
+\setmainfont{Times New Roman}
+\setsansfont{Times New Roman}
+\setmonofont{Times New Roman}
+\newfontfamily\cyrillicfont{Times New Roman}
+\newfontfamily\russianfont{Times New Roman}
+\setdefaultlanguage{russian}
 \usepackage[left=30mm,right=15mm,top=20mm,bottom=20mm]{geometry}
 \usepackage{setspace}
 \onehalfspacing
+\setlength{\emergencystretch}{3em}
 \usepackage{indentfirst}
 \usepackage{graphicx}
 \usepackage{longtable}
+\usepackage{xurl}
 \usepackage{hyperref}
 \usepackage{listings}
 \usepackage{enumitem}
+\usepackage{array}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta}
+\setlength{\LTleft}{0pt}
+\setlength{\LTright}{0pt}
+\urlstyle{same}
 
 \lstset{
-  basicstyle=\small\ttfamily,
+  basicstyle=\scriptsize\ttfamily,
   breaklines=true,
+  breakatwhitespace=false,
   frame=single,
+  captionpos=b,
   columns=fullflexible
 }
+\renewcommand{\lstlistingname}{Листинг}
 
 \begin{document}
 
 \begin{titlepage}
   \begin{center}
-    \textbf{Название образовательной организации}\\
-    \textbf{Факультет / институт}\\
-    \textbf{Кафедра}\\[2cm]
+    {\fontsize{12pt}{12pt}\selectfont\textbf{МИНИСТЕРСТВО НАУКИ И ВЫСШЕГО ОБРАЗОВАНИЯ РОССИЙСКОЙ ФЕДЕРАЦИИ}\\
+    \textbf{ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ БЮДЖЕТНОЕ ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ}}\\
+    {\fontsize{14pt}{14pt}\selectfont\textbf{«МОСКОВСКИЙ АВИАЦИОННЫЙ ИНСТИТУТ \\
+(национальный исследовательский университет)» (МАИ)}}\\
+    {\fontsize{14pt}{14pt}\selectfont\textbf{Институт № 8 «Компьютерные науки и прикладная математика»}}\\
+    {\fontsize{14pt}{14pt}\selectfont\textbf{Кафедра 806 «Вычислительная математика и программирование»}}\\[2cm]
 
-    \textbf{Пояснительная записка к курсовой работе}\\
-    по дисциплине «Базы данных»\\[1.5cm]
-
-    \textbf{Тема:} Информационная система для управления ML‑экспериментами и моделями\\[2cm]
+    {\fontsize{16pt}{16pt}\selectfont\textbf{Курсовой проект}}\\
+    {\fontsize{16pt}{16pt}\selectfont\textbf{по дисциплине «Базы данных»}}\\
+    {\fontsize{16pt}{16pt}\selectfont\textbf{Тема: «Информационная система для управления ML‑экспериментами и моделями»}}\\[2cm]
   \end{center}
 
   \vfill
 
   \begin{flushright}
-    Выполнил: \underline{\hspace{6cm}}\\
-    Группа: \underline{\hspace{6cm}}\\[0.5cm]
-    Руководитель: \underline{\hspace{6cm}}\\
+    {\fontsize{14pt}{14pt}\selectfont
+    \begin{tabular}{@{}l l@{}}
+      Студент: & Ибрагимов Д.М.\\
+      Группа: & М8О-308Б-23\\
+      Преподаватель: & Грубенко М.Д.\\
+      Оценка: & \underline{\hspace{3.6cm}}\\
+      Дата: & \underline{\hspace{3.6cm}}\\
+      Подпись: & \underline{\hspace{3.6cm}}\\
+    \end{tabular}}
   \end{flushright}
 
   \vfill
 
   \begin{center}
-    Город, \the\year\ г.
+    Москва \the\year\
   \end{center}
 \end{titlepage}
 
+\setcounter{tocdepth}{2}
 \tableofcontents
 \newpage
+\sloppy
 
 \section*{Введение}
 \addcontentsline{toc}{section}{Введение}
@@ -79,10 +94,65 @@
 Ключевые сценарии: регистрация пользователей, создание проектов и экспериментов, запуск runs, логирование метрик,
 хранение ссылок на артефакты и сравнение результатов.
 
+\subsection{Требования к системе}
+Согласно заданию, система должна демонстрировать полный цикл проектирования БД и интеграцию с backend:
+\begin{itemize}[leftmargin=1.25cm]
+  \item не менее 9–10 таблиц, связи 1:1, 1:N, N:M, каждая таблица с 5+ полями;
+  \item ключевые сущности предметной области и журнал аудита изменений;
+  \item ограничения PK/FK/UNIQUE/CHECK/NOT NULL и каскадные действия;
+  \item объём данных: крупные таблицы 500–1000 записей, транзакционные — 5000+;
+  \item batch‑import с логированием ошибок построчно;
+  \item CRUD через API, аналитические запросы через SQL;
+  \item минимум 3 VIEW и 2 функции (скалярная и табличная), триггеры на аудит и агрегаты;
+  \item индексы и демонстрация улучшения производительности до/после (планы выполнения — в приложении);
+  \item Swagger/\allowbreak OpenAPI документация, контейнеризация через Docker Compose;
+  \item отсутствие секретов в коде и параметризация SQL‑запросов.
+\end{itemize}
+
+\subsection{Теоретические основы}
+Реляционная модель описывает данные в виде таблиц (отношений) с ключами и ограничениями,
+что позволяет обеспечивать целостность и согласованность при изменениях. В работе применяются
+принципы нормализации до 3НФ: данные разделены на сущности (users, projects, experiments),
+а зависимости фиксируются внешними ключами. Это уменьшает дублирование и упрощает поддержку связей.
+
+Для обеспечения надёжности используются транзакции: операции, затрагивающие несколько таблиц
+(например, создание run и run\_configs), выполняются атомарно. Отдельный журнал аудита
+фиксирует изменения строк с указанием операции и автора, что облегчает контроль качества данных.
+
+Индексация применяется к полям в условиях WHERE/JOIN/ORDER BY. Для аналитики используются VIEW,
+а для типовых отчётов — функции, инкапсулирующие сложную логику вычислений.
+
 \section{Проектная часть}
 \subsection{Архитектура системы}
-Архитектура включает PostgreSQL 16, backend на FastAPI + SQLAlchemy + Alembic и frontend для демонстрации.
-Компоненты запускаются через Docker Compose.
+Система построена по трёхзвенной схеме: клиент (Swagger/Frontend) → backend API → PostgreSQL.
+Компоненты развёрнуты через Docker Compose и обмениваются данными по внутренней сети;
+конфигурация передаётся через переменные окружения.
+
+В составе развертывания выделены сервисы:
+\begin{itemize}[leftmargin=1.25cm]
+  \item frontend — статический интерфейс (дашборды) на Nginx, обращается к API по HTTP;
+  \item backend — FastAPI‑приложение, реализует CRUD, отчёты и batch‑import;
+  \item db — PostgreSQL с ограничениями, индексами, VIEW, функциями и триггерами.
+\end{itemize}
+
+Backend реализует слоистую архитектуру:
+\begin{itemize}[leftmargin=1.25cm]
+  \item слой API (routers) — HTTP‑эндпойнты и маршрутизация запросов;
+  \item слой схем (schemas) — валидация и сериализация данных;
+  \item слой доменной модели (models) — ORM‑сущности и связи;
+  \item слой доступа к данным (db) — сессии, транзакции, конфигурация соединений;
+  \item слой безопасности (auth/permissions) — JWT‑аутентификация и RBAC‑проверки.
+\end{itemize}
+
+CRUD‑операции выполняются через ORM, а аналитика — через параметризованные SQL‑запросы,
+функции и представления. Все SQL‑объекты (VIEW, функции, триггеры) хранятся в \texttt{sql/}
+и применяются миграциями Alembic, что обеспечивает воспроизводимость схемы.
+Поток обработки запроса включает проверку JWT, контроль роли в организации/проекте,
+выполнение транзакции и фиксацию аудита через триггеры. Backend устанавливает идентификатор
+пользователя в контексте БД (\texttt{set\_config('app.user\_id', ...)}), чтобы аудит
+фиксировал автора изменений. Batch‑import записывает задания в \texttt{batch\_import\_jobs}
+и ошибки в \texttt{batch\_import\_errors} без остановки всего процесса. Артефакты моделей
+хранятся в виде ссылок (URI), что исключает хранение бинарных данных в БД.
 
 \subsection{Проектирование структуры базы данных}
 Схема включает 18 таблиц, обеспечивающих связи 1:1, 1:N и N:M:
@@ -107,13 +177,77 @@
 
 Ограничения целостности реализованы через PK, FK, UNIQUE, CHECK и NOT NULL, с каскадным удалением/обновлением
 для зависимых сущностей. Поля времени: created\_at / updated\_at (где применимо).
+Все изменения схемы выполняются через Alembic‑миграции.
+ER‑диаграмма представлена в приложении.
+
+\clearpage
+\subsection{Описание ключевых таблиц}
+Ниже приведён укрупнённый перечень основных сущностей и их назначение:
+
+\begin{longtable}{|p{0.26\textwidth}|p{0.68\textwidth}|}
+\hline
+\textbf{Таблица} & \textbf{Назначение и ключевые поля} \\\\
+\hline
+users & Пользователи системы: email, full\_name, password\_hash, is\_active, created\_at. \\\\
+\hline
+organizations & Организации/команды: name, description, created\_by, created\_at. \\\\
+\hline
+org\_members & Членство пользователей в организациях: role, joined\_at, is\_active, UNIQUE(org\_id, user\_id). \\\\
+\hline
+ml\_projects & ML‑проекты в рамках организации: name, status, description, created\_at. \\\\
+\hline
+project\_members & Роли пользователей в проектах: role, added\_at, is\_active, UNIQUE(project\_id, user\_id). \\\\
+\hline
+datasets / dataset\_versions & Датасеты и версии: version\_label, storage\_uri, content\_hash, size\_bytes. \\\\
+\hline
+experiments / runs & Эксперименты и запуски: status, started\_at, finished\_at, git\_commit, notes. \\\\
+\hline
+run\_configs & Конфигурации запусков (1:1): params\_json, env\_json, command\_line, seed. \\\\
+\hline
+metric\_definitions / run\_metric\_values & Справочник метрик и значения: goal, scope, step, value. \\\\
+\hline
+artifacts / run\_artifacts & Артефакты и связи с runs: uri, artifact\_type, checksum, alias. \\\\
+\hline
+audit\_log & Журнал аудита: table\_name, operation, row\_pk, changed\_by, old\_data, new\_data. \\\\
+\hline
+batch\_import\_\allowbreak jobs / batch\_import\_\allowbreak errors & Журнал batch‑импорта: status, source\_format, stats\_json, row\_level ошибки. \\\\
+\hline
+project\_metric\_\allowbreak summary & Агрегаты по проекту: best\_value, best\_run\_id, sample\_size. \\\\
+\hline
+\caption{Перечень ключевых таблиц и их назначение} \\
+\end{longtable}
+\clearpage
+
+\subsection{Ограничения целостности и каскады}
+Для корректности данных применяются:
+\begin{itemize}[leftmargin=1.25cm]
+  \item уникальность ключевых полей (email, имена в рамках org/project, ключи справочников);
+  \item проверки статусов и ролей через CHECK (например, status IN ('active','archived'));
+  \item каскадные действия: удаление проекта удаляет датасеты/\allowbreak эксперименты/\allowbreak артефакты и связанные сущности;
+  \item защита транзакционных таблиц: для \texttt{run\_metric\_\allowbreak values} запрещены отрицательные step.
+\end{itemize}
+
+\subsection{Ролевая модель и безопасность}
+Доступ к данным реализован через JWT‑авторизацию и роли в организациях/проектах. Для
+CRUD‑операций проверяется минимально необходимая роль: viewer для чтения, editor/admin
+для модификаций. Для аудита используется \texttt{set\_config('app.user\_id', ...)} в транзакции.
+SQL‑запросы выполняются только с параметризацией, что исключает SQL‑инъекции. Секреты
+и учётные данные не хранятся в коде и передаются через \texttt{.env}.
+
+\subsection{Batch‑import и транзакции}
+Batch‑import поддерживает загрузку \texttt{metrics} и \texttt{datasets} из CSV/JSON. Каждая строка
+обрабатывается отдельно: успешные записи фиксируются, ошибки сохраняются в
+\texttt{batch\_import\_\allowbreak errors} без остановки всего job. В \texttt{batch\_import\_\allowbreak jobs}
+хранится статус, источник и статистика (inserted / errors). Транзакции используются
+для операций, затрагивающих несколько таблиц (создание run + run\_configs, завершение run
+с финальными метриками).
 
 \subsection{Представления}
 Реализованы три VIEW:
 \begin{itemize}[leftmargin=1.25cm]
   \item v\_runs\_with\_final\_metrics — финальные метрики по runs;
   \item v\_best\_runs\_per\_experiment — лучший run по ключевой метрике;
-  \item v\_project\_quality\_dashboard — агрегаты по проекту (success rate, медиана времени, best metric).
+  \item v\_project\_quality\_\allowbreak dashboard — агрегаты по проекту (success rate, медиана времени, best metric).
 \end{itemize}
 
 \subsection{Функции и триггеры}
@@ -126,13 +260,17 @@
 \textbf{Триггеры:}
 \begin{itemize}[leftmargin=1.25cm]
   \item fn\_audit\_log — аудит INSERT/UPDATE/DELETE для ключевых таблиц.
-  \item fn\_update\_project\_metric\_summary — поддержка агрегатов в project\_metric\_summary.
+  \item fn\_update\_project\_\allowbreak metric\_summary — поддержка агрегатов в project\_metric\_\allowbreak summary.
 \end{itemize}
+Аудит реализован как универсальная trigger‑function, которая записывает старые и новые значения в JSONB.
+Агрегирующий триггер пересчитывает лучшие значения метрик по проекту с учётом цели (min/max/last).
 
 \subsection{API и взаимодействие с БД}
 API предоставляет CRUD для всех сущностей и отчётные endpoints.
 Отчёты вызывают функции и представления (leaderboard, best‑run, dashboard). Batch‑import логирует ошибки
-в batch\_import\_errors и сохраняет статистику в batch\_import\_jobs.
+в batch\_import\_\allowbreak errors и сохраняет статистику в batch\_import\_\allowbreak jobs.
+Документация доступна через Swagger/\allowbreak OpenAPI. Авторизация реализована по JWT (OAuth2 password flow),
+токен передаётся в заголовке \texttt{Authorization: Bearer <token>}.
 
 \subsection{Примеры бизнес‑запросов}
 Ниже приведены примеры SQL‑запросов из \texttt{sql/business\_queries.sql}.
@@ -156,6 +294,21 @@ FROM final_metrics
 WHERE rn = 1;
 \end{lstlisting}
 
+\begin{lstlisting}[language=SQL,caption={Тренд метрик по версиям датасета}]
+SELECT dv.dataset_id,
+       dv.dataset_version_id,
+       dv.version_label,
+       AVG(rmv.value) AS avg_metric_value,
+       COUNT(DISTINCT r.run_id) AS runs_count
+FROM dataset_versions dv
+JOIN runs r ON r.dataset_version_id = dv.dataset_version_id
+JOIN run_metric_values rmv ON rmv.run_id = r.run_id AND rmv.step IS NULL
+JOIN metric_definitions md ON md.metric_id = rmv.metric_id
+WHERE md.key = :metric_key AND rmv.scope = :scope
+GROUP BY dv.dataset_id, dv.dataset_version_id, dv.version_label
+ORDER BY dv.version_label;
+\end{lstlisting}
+
 \section{Технологическая часть}
 \subsection{Контейнеризация и запуск}
 Проект разворачивается через Docker Compose. Backend автоматически применяет миграции Alembic при старте.
@@ -166,34 +319,50 @@ WHERE rn = 1;
   \item Открыть Swagger: \texttt{/docs}
 \end{enumerate}
 
+\subsection{Интерфейс пользователя}
+Полноценный фронтенд не является обязательным, однако для демонстрации реализован
+лёгкий интерфейс на Vite + React. Он отображает обзор по проекту, лидерборд, список запусков
+и сведения о batch‑import. Основной демонстрационный интерфейс остаётся Swagger, где
+доступны все CRUD‑операции и отчёты.
+
 \subsection{Тестирование и устойчивость}
 В ходе проверки выполнены:
 \begin{itemize}[leftmargin=1.25cm]
   \item загрузка seed‑данных (1000 runs, 44000 metric values);
   \item проверка аудита: в \texttt{audit\_log} сформировано 3005 записей после seed‑загрузки;
   \item вызов функций: \texttt{fn\_best\_run\_id} возвращает корректный run\_id для выбранного эксперимента;
-  \item проверка отчётов и производительности (см. \texttt{docs/perf\_report.md}).
+  \item проверка отчётов и производительности (см. приложение с анализом производительности);
+  \item проверка авторизации и ролей: доступ к данным ограничен RBAC, Swagger использует OAuth2.
 \end{itemize}
 Ошибки одиночных строк в batch‑import фиксируются без остановки всего job, что обеспечивает устойчивость обработки.
 
 \section{Оптимизация и производительность}
 Созданы индексы для полей в WHERE/JOIN/ORDER BY, включая частичный индекс для финальных метрик
-(\texttt{ix\_rmv\_final\_metric}). Результаты EXPLAIN ANALYZE фиксируются в
-\texttt{docs/perf\_report.md} и демонстрируют улучшение производительности до/после индексов.
+(\texttt{ix\_rmv\_final\_metric}). Планы выполнения запросов и результаты измерений приведены в приложении и
+демонстрируют улучшение производительности до/после индексов. Каждый запрос запускался 3 раза,
+в таблице указана медиана времени выполнения. Перед сериями выполнялись \texttt{CHECKPOINT} и
+\texttt{DISCARD ALL}, что снижает влияние кэшей на измерения.
+Тесты проводились на seed‑наборе данных (1000 runs, 44000 metric values). Для сравнения временно
+удаляются индексы, затем выполняются те же запросы после их создания.
 
+\clearpage
 Ниже приведено сравнение времени выполнения двух ключевых запросов (данные получены на seed‑наборе):
-
-\begin{center}
-\begin{longtable}{|p{7cm}|r|r|r|}
-\hline
-\textbf{Запрос} & \textbf{До индексов, ms} & \textbf{После индексов, ms} & \textbf{Ускорение} \\\\
-\hline
-Лидерборд эксперимента (fn\_experiment\_leaderboard) & 8.294 & 0.857 & 9.7x \\\\
-\hline
-Тренд по версиям датасетов (avg финальных метрик) & 2.496 & 1.215 & 2.1x \\\\
-\hline
-\end{longtable}
-\end{center}
+{\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.1}
+\begin{table}[h]
+  \centering
+  \begin{tabular}{|p{0.41\textwidth}|>{\raggedleft\arraybackslash}p{0.15\textwidth}|>{\raggedleft\arraybackslash}p{0.15\textwidth}|>{\raggedleft\arraybackslash}p{0.14\textwidth}|}
+    \hline
+    \textbf{Запрос} & \textbf{До индексов,\newline ms} & \textbf{После индексов,\newline ms} & \textbf{Коэф.} \\\\
+    \hline
+    Лидерборд эксперимента (fn\_experiment\_leaderboard) & 2.208 & 0.267 & 8.3x \\\\
+    \hline
+    Тренд по версиям датасетов (avg финальных метрик) & 1.990 & 0.945 & 2.1x \\\\
+    \hline
+  \end{tabular}
+  \caption{Сравнение времени выполнения ключевых запросов}
+\end{table}}
+\clearpage
 
 \section*{Заключение}
 \addcontentsline{toc}{section}{Заключение}
@@ -201,25 +370,257 @@ WHERE rn = 1;
 batch‑import, аналитические отчёты и демонстрацию производительности. Решение готово к защите и соответствует
 требованиям курсовой работы.
 
+\clearpage
 \appendix
-\section{Список основных endpoints}
+\renewcommand{\thesection}{\Asbuk{section}}
+\section*{Приложения}
+\addcontentsline{toc}{section}{Приложения}
+\newcommand{\appsection}[1]{%
+  \refstepcounter{section}%
+  \subsection*{Приложение \thesection. #1}%
+  \addcontentsline{toc}{subsection}{Приложение \thesection. #1}%
+}
+\small
+\appsection{ER-диаграмма}
+\begin{figure}[h]
+  \centering
+  \newcommand{\erdImage}{drawSQL-image-export-2025-12-27.png}
+  \IfFileExists{docs/images/\erdImage}{%
+    \includegraphics[width=0.8\textwidth]{docs/images/\erdImage}%
+  }{%
+    \includegraphics[width=0.8\textwidth]{images/\erdImage}%
+  }
+  \caption{ER-диаграмма базы данных (DrawSQL)}
+\end{figure}
+
+\appsection{Список основных endpoints}
 \begin{itemize}[leftmargin=1.25cm]
-  \item CRUD: \texttt{/api/users}, \texttt{/api/orgs}, \texttt{/api/org-members}, \texttt{/api/projects},
-        \texttt{/api/project-members}, \texttt{/api/datasets}, \texttt{/api/dataset-versions}, \texttt{/api/experiments},
-        \texttt{/api/runs}, \texttt{/api/run-configs}, \texttt{/api/run-metric-values}, \texttt{/api/metric-definitions},
-        \texttt{/api/artifacts}, \texttt{/api/run-artifacts}, \texttt{/api/audit-log},
-        \texttt{/api/batch-import-jobs}, \texttt{/api/batch-import-errors}, \texttt{/api/project-metric-summary}.
-  \item Отчёты: \texttt{/api/reports/experiments/{experiment\_id}/leaderboard},
-        \texttt{/api/reports/experiments/{experiment\_id}/best-run},
-        \texttt{/api/reports/projects/{project\_id}/dashboard}.
-  \item Авторизация: \texttt{/api/auth/register}, \texttt{/api/auth/login}.
+  \item CRUD:
+    \begin{itemize}[leftmargin=1.25cm]
+      \item \path{/api/users}
+      \item \path{/api/orgs}
+      \item \path{/api/org-members}
+      \item \path{/api/projects}
+      \item \path{/api/project-members}
+      \item \path{/api/datasets}
+      \item \path{/api/dataset-versions}
+      \item \path{/api/experiments}
+      \item \path{/api/runs}
+      \item \path{/api/run-configs}
+      \item \path{/api/run-metric-values}
+      \item \path{/api/metric-definitions}
+      \item \path{/api/artifacts}
+      \item \path{/api/run-artifacts}
+      \item \path{/api/audit-log}
+      \item \path{/api/batch-import-jobs}
+      \item \path{/api/batch-import-errors}
+      \item \path{/api/project-metric-summary}
+    \end{itemize}
+  \item Отчёты:
+    \begin{itemize}[leftmargin=1.25cm]
+      \item \path{/api/reports/experiments/{experiment_id}/leaderboard}
+      \item \path{/api/reports/experiments/{experiment_id}/best-run}
+      \item \path{/api/reports/projects/{project_id}/dashboard}
+    \end{itemize}
+  \item Авторизация:
+    \begin{itemize}[leftmargin=1.25cm]
+      \item \path{/api/auth/register}
+      \item \path{/api/auth/login}
+      \item \path{/api/auth/token}
+    \end{itemize}
 \end{itemize}
 
-\section{Ссылки на материалы}
+\appsection{Пример использования API}
+В примере используются значения из \texttt{.env}: \texttt{SEED\_TEST\_USER\_EMAIL} и
+\texttt{SEED\_TEST\_USER\_PASSWORD}.
+\begin{lstlisting}[caption={Получение токена и вызов отчётов}]
+export API_URL=http://localhost:8000
+export API_EMAIL=your@email
+export API_PASSWORD=your_password
+export NO_PROXY=localhost,127.0.0.1
+
+TOKEN=$(curl -s -X POST "$API_URL/api/auth/token" \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "username=$API_EMAIL&password=$API_PASSWORD" | \
+  python3 -c "import sys, json; print(json.load(sys.stdin)['access_token'])")
+
+PROJECT_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/projects" | \
+  python3 -c "import sys, json; print(json.load(sys.stdin)[0]['project_id'])")
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/reports/projects/$PROJECT_ID/dashboard"
+
+EXP_ID=$(curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/experiments" | \
+  python3 -c "import sys, json; print(json.load(sys.stdin)[0]['experiment_id'])")
+
+curl -s -H "Authorization: Bearer $TOKEN" \
+  "$API_URL/api/reports/experiments/$EXP_ID/leaderboard?metric_key=accuracy&scope=val&limit=3"
+\end{lstlisting}
+
+\appsection{Анализ производительности запросов}
+В приложении зафиксированы условия и сценарии проверки производительности:
 \begin{itemize}[leftmargin=1.25cm]
-  \item Скрипты SQL: \texttt{sql/}
-  \item Миграции: \texttt{migrations/}
-  \item Отчёт производительности: \texttt{docs/perf\_report.md}
+  \item два ключевых запроса: лидерборд эксперимента и тренд по версиям датасетов;
+  \item замеры до и после индексации, по 3 прогона каждого запроса;
+  \item среда измерений: seed‑набор (1000 runs, 44000 metric values), сброс кэшей через
+        \texttt{CHECKPOINT} и \texttt{DISCARD ALL}.
+\end{itemize}
+\subsection*{Лидерборд: до индексов (прогон 2)}
+\begin{lstlisting}
+QUERY PLAN
+------------------------------------------------------------
+ Function Scan on fn_experiment_leaderboard  (cost=3.75..13.75 rows=1000 width=96) (actual time=2.066..2.067 rows=10 loops=1)
+   Buffers: shared hit=3575
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=3.50..3.50 rows=1 width=24) (actual time=0.021..0.021 rows=1 loops=1)
+           Buffers: shared hit=2
+           ->  Sort  (cost=3.50..3.75 rows=100 width=24) (actual time=0.020..0.020 rows=1 loops=1)
+                 Sort Key: experiments.created_at
+                 Sort Method: top-N heapsort  Memory: 25kB
+                 Buffers: shared hit=2
+                 ->  Seq Scan on experiments  (cost=0.00..3.00 rows=100 width=24) (actual time=0.005..0.011 rows=100 loops=1)
+                       Buffers: shared hit=2
+ Planning Time: 0.066 ms
+ Execution Time: 2.078 ms
+\end{lstlisting}
+
+\subsection*{Лидерборд: после индексов (прогон 2)}
+\begin{lstlisting}
+QUERY PLAN
+------------------------------------------------------------
+ Function Scan on fn_experiment_leaderboard  (cost=3.75..13.75 rows=1000 width=96) (actual time=0.257..0.258 rows=10 loops=1)
+   Buffers: shared hit=63
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=3.50..3.50 rows=1 width=24) (actual time=0.018..0.018 rows=1 loops=1)
+           Buffers: shared hit=2
+           ->  Sort  (cost=3.50..3.75 rows=100 width=24) (actual time=0.017..0.017 rows=1 loops=1)
+                 Sort Key: experiments.created_at
+                 Sort Method: top-N heapsort  Memory: 25kB
+                 Buffers: shared hit=2
+                 ->  Seq Scan on experiments  (cost=0.00..3.00 rows=100 width=24) (actual time=0.004..0.009 rows=100 loops=1)
+                       Buffers: shared hit=2
+ Planning Time: 0.033 ms
+ Execution Time: 0.267 ms
+\end{lstlisting}
+
+\subsection*{Тренд по версиям датасета: до индексов (прогон 2)}
+\begin{lstlisting}
+QUERY PLAN
+------------------------------------------------------------
+ Limit  (cost=1314.15..1314.20 rows=20 width=51) (actual time=2.192..2.196 rows=20 loops=1)
+   Buffers: shared hit=589
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.15..8.17 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+           Buffers: shared hit=2
+           ->  Index Scan using metric_definitions_key_key on metric_definitions  (cost=0.15..8.17 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+                 Index Cond: (key = 'accuracy'::text)
+                 Buffers: shared hit=2
+   ->  Sort  (cost=1305.98..1307.36 rows=551 width=51) (actual time=2.191..2.194 rows=20 loops=1)
+         Sort Key: (avg(rmv.value)) DESC
+         Sort Method: top-N heapsort  Memory: 29kB
+         Buffers: shared hit=589
+         ->  HashAggregate  (cost=1284.43..1291.32 rows=551 width=51) (actual time=2.068..2.125 rows=826 loops=1)
+               Group Key: e.project_id, dv.dataset_version_id
+               Batches: 1  Memory Usage: 297kB
+               Buffers: shared hit=589
+               ->  Hash Join  (cost=51.45..1278.92 rows=551 width=43) (actual time=0.168..1.922 rows=1000 loops=1)
+                     Hash Cond: (r.experiment_id = e.experiment_id)
+                     Buffers: shared hit=589
+                     ->  Hash Join  (cost=47.20..1273.16 rows=551 width=43) (actual time=0.152..1.826 rows=1000 loops=1)
+                           Hash Cond: (r.dataset_version_id = dv.dataset_version_id)
+                           Buffers: shared hit=587
+                           ->  Hash Join  (cost=40.50..1264.96 rows=551 width=40) (actual time=0.135..1.533 rows=1000 loops=1)
+                                 Hash Cond: (rmv.run_id = r.run_id)
+                                 Buffers: shared hit=583
+                                 ->  Seq Scan on run_metric_values rmv  (cost=0.00..1223.00 rows=551 width=24) (actual time=0.006..1.304 rows=1000 loops=1)
+                                       Filter: ((step IS NULL) AND (metric_id = $0) AND (scope = 'val'::text))
+                                       Rows Removed by Filter: 43000
+                                       Buffers: shared hit=565
+                                 ->  Hash  (cost=28.00..28.00 rows=1000 width=48) (actual time=0.127..0.128 rows=1000 loops=1)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 87kB
+                                       Buffers: shared hit=18
+                                       ->  Seq Scan on runs r  (cost=0.00..28.00 rows=1000 width=48) (actual time=0.002..0.059 rows=1000 loops=1)
+                                             Buffers: shared hit=18
+                           ->  Hash  (cost=5.20..5.20 rows=120 width=19) (actual time=0.016..0.017 rows=120 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 14kB
+                                 Buffers: shared hit=4
+                                 ->  Seq Scan on dataset_versions dv  (cost=0.00..5.20 rows=120 width=19) (actual time=0.001..0.009 rows=120 loops=1)
+                                       Buffers: shared hit=4
+                     ->  Hash  (cost=3.00..3.00 rows=100 width=32) (actual time=0.014..0.015 rows=100 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 15kB
+                           Buffers: shared hit=2
+                           ->  Seq Scan on experiments e  (cost=0.00..3.00 rows=100 width=32) (actual time=0.002..0.007 rows=100 loops=1)
+                                 Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=17
+ Planning Time: 0.239 ms
+ Execution Time: 2.228 ms
+\end{lstlisting}
+
+\subsection*{Тренд по версиям датасета: после индексов (прогон 2)}
+\begin{lstlisting}
+QUERY PLAN
+------------------------------------------------------------
+ Limit  (cost=703.52..703.57 rows=20 width=51) (actual time=0.822..0.825 rows=20 loops=1)
+   Buffers: shared hit=84
+   InitPlan 1 (returns $0)
+     ->  Limit  (cost=0.15..8.17 rows=1 width=16) (actual time=0.004..0.005 rows=1 loops=1)
+           Buffers: shared hit=2
+           ->  Index Scan using metric_definitions_key_key on metric_definitions  (cost=0.15..8.17 rows=1 width=16) (actual time=0.004..0.004 rows=1 loops=1)
+                 Index Cond: (key = 'accuracy'::text)
+                 Buffers: shared hit=2
+   ->  Sort  (cost=695.35..696.75 rows=559 width=51) (actual time=0.821..0.823 rows=20 loops=1)
+         Sort Key: (avg(rmv.value)) DESC
+         Sort Method: top-N heapsort  Memory: 29kB
+         Buffers: shared hit=84
+         ->  HashAggregate  (cost=673.49..680.48 rows=559 width=51) (actual time=0.681..0.754 rows=826 loops=1)
+               Group Key: e.project_id, dv.dataset_version_id
+               Batches: 1  Memory Usage: 297kB
+               Buffers: shared hit=84
+               ->  Hash Join  (cost=73.46..667.90 rows=559 width=43) (actual time=0.207..0.550 rows=1000 loops=1)
+                     Hash Cond: (r.experiment_id = e.experiment_id)
+                     Buffers: shared hit=84
+                     ->  Hash Join  (cost=69.21..662.12 rows=559 width=43) (actual time=0.191..0.457 rows=1000 loops=1)
+                           Hash Cond: (r.dataset_version_id = dv.dataset_version_id)
+                           Buffers: shared hit=82
+                           ->  Hash Join  (cost=62.51..653.89 rows=559 width=40) (actual time=0.173..0.357 rows=1000 loops=1)
+                                 Hash Cond: (rmv.run_id = r.run_id)
+                                 Buffers: shared hit=78
+                                 ->  Bitmap Heap Scan on run_metric_values rmv  (cost=22.01..611.91 rows=559 width=24) (actual time=0.042..0.126 rows=1000 loops=1)
+                                       Recheck Cond: ((metric_id = $0) AND (scope = 'val'::text) AND (step IS NULL))
+                                       Heap Blocks: exact=50
+                                       Buffers: shared hit=60
+                                       ->  Bitmap Index Scan on ix_rmv_final_metric  (cost=0.00..21.87 rows=559 width=0) (actual time=0.036..0.036 rows=1000 loops=1)
+                                             Index Cond: ((metric_id = $0) AND (scope = 'val'::text))
+                                             Buffers: shared hit=10
+                                 ->  Hash  (cost=28.00..28.00 rows=1000 width=48) (actual time=0.129..0.129 rows=1000 loops=1)
+                                       Buckets: 1024  Batches: 1  Memory Usage: 87kB
+                                       Buffers: shared hit=18
+                                       ->  Seq Scan on runs r  (cost=0.00..28.00 rows=1000 width=48) (actual time=0.002..0.061 rows=1000 loops=1)
+                                             Buffers: shared hit=18
+                           ->  Hash  (cost=5.20..5.20 rows=120 width=19) (actual time=0.016..0.016 rows=120 loops=1)
+                                 Buckets: 1024  Batches: 1  Memory Usage: 14kB
+                                 Buffers: shared hit=4
+                                 ->  Seq Scan on dataset_versions dv  (cost=0.00..5.20 rows=120 width=19) (actual time=0.001..0.009 rows=120 loops=1)
+                                       Buffers: shared hit=4
+                     ->  Hash  (cost=3.00..3.00 rows=100 width=32) (actual time=0.015..0.015 rows=100 loops=1)
+                           Buckets: 1024  Batches: 1  Memory Usage: 15kB
+                           Buffers: shared hit=2
+                           ->  Seq Scan on experiments e  (cost=0.00..3.00 rows=100 width=32) (actual time=0.003..0.008 rows=100 loops=1)
+                                 Buffers: shared hit=2
+ Planning:
+   Buffers: shared hit=31
+ Planning Time: 0.372 ms
+ Execution Time: 0.856 ms
+\end{lstlisting}
+Полные планы выполнения можно получить командой \texttt{psql -f sql/perf\_demo.sql}
+или скриптом \texttt{scripts/run\_perf\_demo.sh}.
+
+\appsection{Ссылки на материалы}
+\begin{itemize}[leftmargin=1.25cm]
+  \item \url{https://github.com/L0ckR/DB_Course_MAI_2025}
 \end{itemize}
 
 \end{document}

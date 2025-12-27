@@ -15,9 +15,9 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 @router.get("/experiments/{experiment_id}/leaderboard")
 def experiment_leaderboard(
     experiment_id: uuid.UUID,
-    metric_key: str = Query(...),
-    scope: str = Query(...),
-    limit: int = Query(10, ge=1, le=100),
+    metric_key: str = Query(..., example="accuracy"),
+    scope: str = Query(..., example="val"),
+    limit: int = Query(10, ge=1, le=100, example=10),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> list[dict]:
@@ -42,8 +42,8 @@ def experiment_leaderboard(
 @router.get("/experiments/{experiment_id}/best-run")
 def experiment_best_run(
     experiment_id: uuid.UUID,
-    metric_key: str = Query(...),
-    scope: str = Query(...),
+    metric_key: str = Query(..., example="accuracy"),
+    scope: str = Query(..., example="val"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> dict:
