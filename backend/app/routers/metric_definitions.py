@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.security import get_current_user
 from app.db.deps import get_db
 from app.models.models import MetricDefinition
 from app.schemas.metrics import (
@@ -12,7 +13,11 @@ from app.schemas.metrics import (
     MetricDefinitionUpdate,
 )
 
-router = APIRouter(prefix="/metric-definitions", tags=["metric-definitions"])
+router = APIRouter(
+    prefix="/metric-definitions",
+    tags=["metric-definitions"],
+    dependencies=[Depends(get_current_user)],
+)
 
 
 @router.post("", response_model=MetricDefinitionRead, status_code=status.HTTP_201_CREATED)

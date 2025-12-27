@@ -4,6 +4,7 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.schemas.base import ORMBase
+from app.schemas.enums import RunStatus
 
 
 class RunConfigCreate(BaseModel):
@@ -26,7 +27,7 @@ class RunCreate(BaseModel):
     experiment_id: uuid.UUID
     dataset_version_id: uuid.UUID
     run_name: str | None = None
-    status: str
+    status: RunStatus
     started_at: datetime | None = None
     finished_at: datetime | None = None
     created_by: uuid.UUID | None = None
@@ -38,7 +39,7 @@ class RunCreate(BaseModel):
 class RunUpdate(BaseModel):
     dataset_version_id: uuid.UUID | None = None
     run_name: str | None = None
-    status: str | None = None
+    status: RunStatus | None = None
     started_at: datetime | None = None
     finished_at: datetime | None = None
     git_commit: str | None = None
@@ -50,7 +51,7 @@ class RunRead(ORMBase):
     experiment_id: uuid.UUID
     dataset_version_id: uuid.UUID
     run_name: str | None
-    status: str
+    status: RunStatus
     started_at: datetime | None
     finished_at: datetime | None
     created_by: uuid.UUID | None

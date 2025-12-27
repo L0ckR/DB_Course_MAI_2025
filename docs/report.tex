@@ -1,0 +1,225 @@
+% Compile with XeLaTeX or LuaLaTeX to use Times New Roman
+\documentclass[14pt,a4paper]{extarticle}
+
+\usepackage{fontspec}
+\usepackage{polyglossia}
+\setdefaultlanguage{russian}
+
+% Prefer Times New Roman for ГОСТ requirements; fall back if the font is missing.
+\IfFontExistsTF{Times New Roman}{
+  \setmainfont{Times New Roman}
+  \newfontfamily\cyrillicfont{Times New Roman}
+}{
+  \setmainfont{TeX Gyre Termes}
+  \IfFontExistsTF{PT Serif}{
+    \newfontfamily\cyrillicfont{PT Serif}
+  }{
+    \newfontfamily\cyrillicfont{DejaVu Serif}
+  }
+}
+\usepackage[left=30mm,right=15mm,top=20mm,bottom=20mm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+\usepackage{indentfirst}
+\usepackage{graphicx}
+\usepackage{longtable}
+\usepackage{hyperref}
+\usepackage{listings}
+\usepackage{enumitem}
+
+\lstset{
+  basicstyle=\small\ttfamily,
+  breaklines=true,
+  frame=single,
+  columns=fullflexible
+}
+
+\begin{document}
+
+\begin{titlepage}
+  \begin{center}
+    \textbf{Название образовательной организации}\\
+    \textbf{Факультет / институт}\\
+    \textbf{Кафедра}\\[2cm]
+
+    \textbf{Пояснительная записка к курсовой работе}\\
+    по дисциплине «Базы данных»\\[1.5cm]
+
+    \textbf{Тема:} Информационная система для управления ML‑экспериментами и моделями\\[2cm]
+  \end{center}
+
+  \vfill
+
+  \begin{flushright}
+    Выполнил: \underline{\hspace{6cm}}\\
+    Группа: \underline{\hspace{6cm}}\\[0.5cm]
+    Руководитель: \underline{\hspace{6cm}}\\
+  \end{flushright}
+
+  \vfill
+
+  \begin{center}
+    Город, \the\year\ г.
+  \end{center}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+\section*{Введение}
+\addcontentsline{toc}{section}{Введение}
+Объект исследования — информационная система для управления жизненным циклом ML‑экспериментов и моделей.
+Предмет исследования — проектирование реляционной базы данных, поддерживающей аудит, аналитические запросы
+и интеграцию с backend‑API. Цель работы — разработать систему, демонстрирующую проектирование БД,
+ограничения целостности, функции, триггеры, оптимизацию запросов и batch‑import.
+
+\section{Аналитическая часть}
+Системы типа MLflow/Weights\&Biases фиксируют конфигурации запусков, метрики и артефакты.
+В курсовой работе важно обеспечить целостность данных и воспроизводимость, а также поддержать аналитические отчёты.
+Ключевые сценарии: регистрация пользователей, создание проектов и экспериментов, запуск runs, логирование метрик,
+хранение ссылок на артефакты и сравнение результатов.
+
+\section{Проектная часть}
+\subsection{Архитектура системы}
+Архитектура включает PostgreSQL 16, backend на FastAPI + SQLAlchemy + Alembic и frontend для демонстрации.
+Компоненты запускаются через Docker Compose.
+
+\subsection{Проектирование структуры базы данных}
+Схема включает 18 таблиц, обеспечивающих связи 1:1, 1:N и N:M:
+\begin{itemize}[leftmargin=1.25cm]
+  \item users, organizations, org\_members
+  \item ml\_projects, project\_members
+  \item datasets, dataset\_versions
+  \item experiments, runs, run\_configs
+  \item metric\_definitions, run\_metric\_values
+  \item artifacts, run\_artifacts
+  \item audit\_log
+  \item batch\_import\_jobs, batch\_import\_errors
+  \item project\_metric\_summary
+\end{itemize}
+
+Ключевые связи:
+\begin{itemize}[leftmargin=1.25cm]
+  \item 1:1 — runs → run\_configs.
+  \item 1:N — projects → datasets; experiments → runs.
+  \item N:M — runs ↔ artifacts (через run\_artifacts).
+\end{itemize}
+
+Ограничения целостности реализованы через PK, FK, UNIQUE, CHECK и NOT NULL, с каскадным удалением/обновлением
+для зависимых сущностей. Поля времени: created\_at / updated\_at (где применимо).
+
+\subsection{Представления}
+Реализованы три VIEW:
+\begin{itemize}[leftmargin=1.25cm]
+  \item v\_runs\_with\_final\_metrics — финальные метрики по runs;
+  \item v\_best\_runs\_per\_experiment — лучший run по ключевой метрике;
+  \item v\_project\_quality\_dashboard — агрегаты по проекту (success rate, медиана времени, best metric).
+\end{itemize}
+
+\subsection{Функции и триггеры}
+\textbf{Функции:}
+\begin{itemize}[leftmargin=1.25cm]
+  \item fn\_best\_run\_id — скалярная функция, возвращающая лучший run по метрике и цели (min/max/last).
+  \item fn\_experiment\_leaderboard — табличная функция для top‑N runs по метрике.
+\end{itemize}
+
+\textbf{Триггеры:}
+\begin{itemize}[leftmargin=1.25cm]
+  \item fn\_audit\_log — аудит INSERT/UPDATE/DELETE для ключевых таблиц.
+  \item fn\_update\_project\_metric\_summary — поддержка агрегатов в project\_metric\_summary.
+\end{itemize}
+
+\subsection{API и взаимодействие с БД}
+API предоставляет CRUD для всех сущностей и отчётные endpoints.
+Отчёты вызывают функции и представления (leaderboard, best‑run, dashboard). Batch‑import логирует ошибки
+в batch\_import\_errors и сохраняет статистику в batch\_import\_jobs.
+
+\subsection{Примеры бизнес‑запросов}
+Ниже приведены примеры SQL‑запросов из \texttt{sql/business\_queries.sql}.
+
+\begin{lstlisting}[language=SQL,caption={Лидерборд по эксперименту с дельтой к среднему}]
+WITH final_metrics AS (
+    SELECT r.experiment_id, r.run_id, r.run_name, rmv.value, md.goal,
+           ROW_NUMBER() OVER (PARTITION BY r.experiment_id
+             ORDER BY CASE WHEN md.goal='min' THEN rmv.value END ASC,
+                      CASE WHEN md.goal='max' THEN rmv.value END DESC,
+                      CASE WHEN md.goal='last' THEN rmv.recorded_at END DESC) AS rn,
+           AVG(rmv.value) OVER (PARTITION BY r.experiment_id) AS avg_value
+    FROM runs r
+    JOIN run_metric_values rmv ON rmv.run_id = r.run_id AND rmv.step IS NULL
+    JOIN metric_definitions md ON md.metric_id = rmv.metric_id
+    WHERE md.key = :metric_key AND rmv.scope = :scope
+)
+SELECT experiment_id, run_id, run_name, value AS best_value, avg_value,
+       value - avg_value AS delta_vs_avg
+FROM final_metrics
+WHERE rn = 1;
+\end{lstlisting}
+
+\section{Технологическая часть}
+\subsection{Контейнеризация и запуск}
+Проект разворачивается через Docker Compose. Backend автоматически применяет миграции Alembic при старте.
+Последовательность запуска:
+\begin{enumerate}[leftmargin=1.25cm]
+  \item \texttt{docker compose up --build}
+  \item \texttt{docker compose exec backend python scripts/seed.py}
+  \item Открыть Swagger: \texttt{/docs}
+\end{enumerate}
+
+\subsection{Тестирование и устойчивость}
+В ходе проверки выполнены:
+\begin{itemize}[leftmargin=1.25cm]
+  \item загрузка seed‑данных (1000 runs, 44000 metric values);
+  \item проверка аудита: в \texttt{audit\_log} сформировано 3005 записей после seed‑загрузки;
+  \item вызов функций: \texttt{fn\_best\_run\_id} возвращает корректный run\_id для выбранного эксперимента;
+  \item проверка отчётов и производительности (см. \texttt{docs/perf\_report.md}).
+\end{itemize}
+Ошибки одиночных строк в batch‑import фиксируются без остановки всего job, что обеспечивает устойчивость обработки.
+
+\section{Оптимизация и производительность}
+Созданы индексы для полей в WHERE/JOIN/ORDER BY, включая частичный индекс для финальных метрик
+(\texttt{ix\_rmv\_final\_metric}). Результаты EXPLAIN ANALYZE фиксируются в
+\texttt{docs/perf\_report.md} и демонстрируют улучшение производительности до/после индексов.
+
+Ниже приведено сравнение времени выполнения двух ключевых запросов (данные получены на seed‑наборе):
+
+\begin{center}
+\begin{longtable}{|p{7cm}|r|r|r|}
+\hline
+\textbf{Запрос} & \textbf{До индексов, ms} & \textbf{После индексов, ms} & \textbf{Ускорение} \\\\
+\hline
+Лидерборд эксперимента (fn\_experiment\_leaderboard) & 8.294 & 0.857 & 9.7x \\\\
+\hline
+Тренд по версиям датасетов (avg финальных метрик) & 2.496 & 1.215 & 2.1x \\\\
+\hline
+\end{longtable}
+\end{center}
+
+\section*{Заключение}
+\addcontentsline{toc}{section}{Заключение}
+Система реализует полноценную реляционную модель для управления ML‑экспериментами, поддерживает аудит,
+batch‑import, аналитические отчёты и демонстрацию производительности. Решение готово к защите и соответствует
+требованиям курсовой работы.
+
+\appendix
+\section{Список основных endpoints}
+\begin{itemize}[leftmargin=1.25cm]
+  \item CRUD: \texttt{/api/users}, \texttt{/api/orgs}, \texttt{/api/org-members}, \texttt{/api/projects},
+        \texttt{/api/project-members}, \texttt{/api/datasets}, \texttt{/api/dataset-versions}, \texttt{/api/experiments},
+        \texttt{/api/runs}, \texttt{/api/run-configs}, \texttt{/api/run-metric-values}, \texttt{/api/metric-definitions},
+        \texttt{/api/artifacts}, \texttt{/api/run-artifacts}, \texttt{/api/audit-log},
+        \texttt{/api/batch-import-jobs}, \texttt{/api/batch-import-errors}, \texttt{/api/project-metric-summary}.
+  \item Отчёты: \texttt{/api/reports/experiments/{experiment\_id}/leaderboard},
+        \texttt{/api/reports/experiments/{experiment\_id}/best-run},
+        \texttt{/api/reports/projects/{project\_id}/dashboard}.
+  \item Авторизация: \texttt{/api/auth/register}, \texttt{/api/auth/login}.
+\end{itemize}
+
+\section{Ссылки на материалы}
+\begin{itemize}[leftmargin=1.25cm]
+  \item Скрипты SQL: \texttt{sql/}
+  \item Миграции: \texttt{migrations/}
+  \item Отчёт производительности: \texttt{docs/perf\_report.md}
+\end{itemize}
+
+\end{document}

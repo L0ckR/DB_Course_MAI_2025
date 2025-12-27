@@ -2,11 +2,25 @@ import uuid
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import insert, select
+from sqlalchemy import insert, or_, select
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_project_role
+from app.core.security import get_current_user
 from app.db.deps import get_db
-from app.models.models import MetricDefinition, Run, RunConfig, RunMetricValue
+from app.models.models import (
+    Dataset,
+    DatasetVersion,
+    Experiment,
+    MetricDefinition,
+    MLProject,
+    OrgMember,
+    ProjectMember,
+    Run,
+    RunConfig,
+    RunMetricValue,
+    User,
+)
 from app.schemas.metrics import RunCompleteRequest, RunMetricValueCreate, RunMetricValueRead
 from app.schemas.runs import RunCreate, RunRead, RunUpdate
 
@@ -14,9 +28,39 @@ router = APIRouter(prefix="/runs", tags=["runs"])
 
 
 @router.post("", response_model=RunRead, status_code=status.HTTP_201_CREATED)
-def create_run(run_in: RunCreate, db: Session = Depends(get_db)) -> Run:
+def create_run(
+    run_in: RunCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Run:
+    experiment = db.get(Experiment, run_in.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    dataset_version = db.get(DatasetVersion, run_in.dataset_version_id)
+    if not dataset_version:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dataset version not found"
+        )
+    dataset = db.get(Dataset, dataset_version.dataset_id)
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found"
+        )
+    if experiment.project_id != dataset.project_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Dataset version belongs to a different project",
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "editor")
+    if run_in.created_by and run_in.created_by != current_user.user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="created_by must match the authenticated user",
+        )
     run_data = run_in.model_dump(exclude={"config"})
-    run = Run(**run_data)
+    run = Run(**run_data, created_by=run_in.created_by or current_user.user_id)
     db.add(run)
     db.flush()
     config = RunConfig(run_id=run.run_id, **run_in.config.model_dump())
@@ -28,27 +72,70 @@ def create_run(run_in: RunCreate, db: Session = Depends(get_db)) -> Run:
 
 @router.get("", response_model=list[RunRead])
 def list_runs(
-    limit: int = 100, offset: int = 0, db: Session = Depends(get_db)
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[Run]:
-    runs = db.scalars(select(Run).limit(limit).offset(offset)).all()
+    member_projects = select(ProjectMember.project_id).where(
+        ProjectMember.user_id == current_user.user_id,
+        ProjectMember.is_active.is_(True),
+    )
+    org_admin_orgs = select(OrgMember.org_id).where(
+        OrgMember.user_id == current_user.user_id,
+        OrgMember.is_active.is_(True),
+        OrgMember.role.in_(["owner", "admin"]),
+    )
+    runs = db.scalars(
+        select(Run)
+        .join(Experiment, Experiment.experiment_id == Run.experiment_id)
+        .join(MLProject, MLProject.project_id == Experiment.project_id)
+        .where(
+            or_(
+                Experiment.project_id.in_(member_projects),
+                MLProject.org_id.in_(org_admin_orgs),
+            )
+        )
+        .limit(limit)
+        .offset(offset)
+    ).all()
     return runs
 
 
 @router.get("/{run_id}", response_model=RunRead)
-def get_run(run_id: uuid.UUID, db: Session = Depends(get_db)) -> Run:
+def get_run(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Run:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "viewer")
     return run
 
 
 @router.put("/{run_id}", response_model=RunRead)
 def update_run(
-    run_id: uuid.UUID, run_in: RunUpdate, db: Session = Depends(get_db)
+    run_id: uuid.UUID,
+    run_in: RunUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Run:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "editor")
     for key, value in run_in.model_dump(exclude_unset=True).items():
         setattr(run, key, value)
     db.commit()
@@ -57,10 +144,20 @@ def update_run(
 
 
 @router.delete("/{run_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_run(run_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+def delete_run(
+    run_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "editor")
     db.delete(run)
     db.commit()
     return None
@@ -68,11 +165,20 @@ def delete_run(run_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
 
 @router.post("/{run_id}/metrics", response_model=list[RunMetricValueRead])
 def add_run_metrics(
-    run_id: uuid.UUID, metrics: list[RunMetricValueCreate], db: Session = Depends(get_db)
+    run_id: uuid.UUID,
+    metrics: list[RunMetricValueCreate],
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[RunMetricValue]:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "editor")
 
     metric_keys = {m.metric_key for m in metrics if m.metric_key}
     key_map: dict[str, uuid.UUID] = {}
@@ -125,10 +231,17 @@ def get_run_metrics(
     from_step: int | None = Query(None, ge=0),
     to_step: int | None = Query(None, ge=0),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[RunMetricValue]:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "viewer")
 
     query = select(RunMetricValue).where(RunMetricValue.run_id == run_id)
     if metric_key:
@@ -145,11 +258,20 @@ def get_run_metrics(
 
 @router.post("/{run_id}/complete", response_model=RunRead)
 def complete_run(
-    run_id: uuid.UUID, payload: RunCompleteRequest, db: Session = Depends(get_db)
+    run_id: uuid.UUID,
+    payload: RunCompleteRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Run:
     run = db.get(Run, run_id)
     if not run:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Run not found")
+    experiment = db.get(Experiment, run.experiment_id)
+    if not experiment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Experiment not found"
+        )
+    require_project_role(db, current_user.user_id, experiment.project_id, "editor")
 
     run.status = payload.status
     run.finished_at = payload.finished_at or datetime.utcnow()
@@ -166,7 +288,7 @@ def complete_run(
             )
             for item in payload.final_metrics
         ]
-        add_run_metrics(run_id=run_id, metrics=metrics, db=db)
+        add_run_metrics(run_id=run_id, metrics=metrics, db=db, current_user=current_user)
     else:
         db.commit()
 

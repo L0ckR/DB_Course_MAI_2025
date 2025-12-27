@@ -8,13 +8,18 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from sqlalchemy import insert, select
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_project_role
+from app.core.security import get_current_user
 from app.db.deps import get_db
 from app.models.models import (
     BatchImportError,
     BatchImportJob,
     Dataset,
+    Experiment,
     MetricDefinition,
+    Run,
     RunMetricValue,
+    User,
 )
 from app.schemas.batch_import import BatchImportJobRead
 
@@ -62,9 +67,9 @@ def batch_import(
     job_type: str = Form(...),
     format: str = Form(...),
     source_uri: str | None = Form(None),
-    created_by: str | None = Form(None),
     file: UploadFile | None = File(None),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> BatchImportJob:
     if not file and not source_uri:
         raise HTTPException(
@@ -86,14 +91,12 @@ def batch_import(
             detail="format must be csv or json",
         )
     source_name = source_uri or (file.filename if file else "upload")
-    created_by_uuid = _parse_uuid(created_by) if created_by else None
-
     job = BatchImportJob(
         job_type=job_type,
         status="created",
         source_format=source_format,
         source_uri=source_name,
-        created_by=created_by_uuid,
+        created_by=current_user.user_id,
     )
     db.add(job)
     db.commit()
@@ -131,6 +134,8 @@ def batch_import(
         return job
 
     metric_cache: dict[str, uuid.UUID] = {}
+    project_access_cache: dict[uuid.UUID, bool] = {}
+    run_project_cache: dict[uuid.UUID, uuid.UUID] = {}
 
     for row_number, row in enumerate(rows, start=1):
         try:
@@ -145,6 +150,22 @@ def batch_import(
 
                 if not run_id or not scope or value is None:
                     raise ValueError("run_id, scope, and value are required")
+
+                if run_id not in run_project_cache:
+                    project_id = db.scalar(
+                        select(Experiment.project_id)
+                        .join(Run, Run.experiment_id == Experiment.experiment_id)
+                        .where(Run.run_id == run_id)
+                    )
+                    if not project_id:
+                        raise ValueError("Run not found")
+                    run_project_cache[run_id] = project_id
+                project_id = run_project_cache[run_id]
+                if project_id not in project_access_cache:
+                    require_project_role(
+                        db, current_user.user_id, project_id, "editor"
+                    )
+                    project_access_cache[project_id] = True
 
                 if not metric_id:
                     if not metric_key:
@@ -179,6 +200,12 @@ def batch_import(
                 description = row.get("description")
                 if not project_id or not name or not task_type:
                     raise ValueError("project_id, name, task_type are required")
+
+                if project_id not in project_access_cache:
+                    require_project_role(
+                        db, current_user.user_id, project_id, "editor"
+                    )
+                    project_access_cache[project_id] = True
 
                 data = {
                     "project_id": project_id,

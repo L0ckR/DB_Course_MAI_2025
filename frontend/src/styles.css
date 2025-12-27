@@ -185,6 +185,7 @@ select {
   display: grid;
   grid-template-columns: 260px 1fr;
   min-height: 100vh;
+  align-items: start;
 }
 
 .sidebar {
@@ -194,6 +195,10 @@ select {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .brand {
@@ -521,6 +526,9 @@ select {
     align-items: center;
     justify-content: space-between;
     gap: 12px;
+    position: static;
+    height: auto;
+    overflow: visible;
   }
 
   .nav {
@@ -531,6 +539,7 @@ select {
   .sidebar-footer {
     flex-direction: row;
     align-items: center;
+    margin-top: 0;
   }
 }
 

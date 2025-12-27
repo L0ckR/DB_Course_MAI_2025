@@ -1,6 +1,11 @@
+import os
 import random
+import sys
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import insert
 from sqlalchemy.orm import Session
@@ -39,9 +44,29 @@ def _random_hash() -> str:
 
 def seed() -> None:
     random.seed(42)
-    default_password_hash = hash_password("demo123")
+    default_password = os.getenv("SEED_DEFAULT_PASSWORD")
+    test_user_email = os.getenv("SEED_TEST_USER_EMAIL")
+    test_user_password = os.getenv("SEED_TEST_USER_PASSWORD")
+    test_user_name = os.getenv("SEED_TEST_USER_FULL_NAME", "Test User")
+
+    if not default_password:
+        raise ValueError("SEED_DEFAULT_PASSWORD is required in the environment")
+    if not test_user_email or not test_user_password:
+        raise ValueError(
+            "SEED_TEST_USER_EMAIL and SEED_TEST_USER_PASSWORD are required in the environment"
+        )
+
+    default_password_hash = hash_password(default_password)
+    test_user_password_hash = hash_password(test_user_password)
 
     with Session(engine) as db:
+        test_user = User(
+            user_id=uuid.uuid4(),
+            email=test_user_email,
+            full_name=test_user_name,
+            password_hash=test_user_password_hash,
+            is_active=True,
+        )
         metric_defs = [
             MetricDefinition(
                 metric_id=uuid.uuid4(),
@@ -75,7 +100,7 @@ def seed() -> None:
         db.add_all(metric_defs)
         db.commit()
 
-        users = [
+        seed_users = [
             User(
                 user_id=uuid.uuid4(),
                 email=_random_email(i),
@@ -85,6 +110,8 @@ def seed() -> None:
             )
             for i in range(1, 501)
         ]
+        users = [test_user] + seed_users
+        sample_users = seed_users
         db.add_all(users)
         db.commit()
 
@@ -94,7 +121,7 @@ def seed() -> None:
                 org_id=uuid.uuid4(),
                 name=f"Org {i}",
                 description=f"Organization {i}",
-                created_by=random.choice(users).user_id,
+                created_by=random.choice(sample_users).user_id,
             )
             orgs.append(org)
         db.add_all(orgs)
@@ -102,7 +129,7 @@ def seed() -> None:
 
         org_members: list[OrgMember] = []
         for org in orgs:
-            members = random.sample(users, 20)
+            members = random.sample(sample_users, 20)
             for member in members:
                 role = "member"
                 if member.user_id == org.created_by:
@@ -117,6 +144,17 @@ def seed() -> None:
                     )
                 )
         db.add_all(org_members)
+        db.commit()
+        test_org = orgs[0]
+        db.add(
+            OrgMember(
+                org_member_id=uuid.uuid4(),
+                org_id=test_org.org_id,
+                user_id=test_user.user_id,
+                role="admin",
+                is_active=True,
+            )
+        )
         db.commit()
 
         projects: list[MLProject] = []
@@ -135,7 +173,7 @@ def seed() -> None:
 
         project_members: list[ProjectMember] = []
         for project in projects:
-            members = random.sample(users, 10)
+            members = random.sample(sample_users, 10)
             for member in members:
                 project_members.append(
                     ProjectMember(
@@ -147,6 +185,19 @@ def seed() -> None:
                     )
                 )
         db.add_all(project_members)
+        db.commit()
+        test_project = next(
+            project for project in projects if project.org_id == test_org.org_id
+        )
+        db.add(
+            ProjectMember(
+                project_member_id=uuid.uuid4(),
+                project_id=test_project.project_id,
+                user_id=test_user.user_id,
+                role="admin",
+                is_active=True,
+            )
+        )
         db.commit()
 
         datasets: list[Dataset] = []
@@ -200,7 +251,7 @@ def seed() -> None:
                         project_id=project.project_id,
                         name=f"Exp {idx + 1} - {project.name}",
                         objective="Optimize metric",
-                        created_by=random.choice(users).user_id,
+                        created_by=random.choice(sample_users).user_id,
                     )
                 )
         db.add_all(experiments)
@@ -224,7 +275,7 @@ def seed() -> None:
                         status=status,
                         started_at=started_at,
                         finished_at=finished_at if status == "finished" else None,
-                        created_by=random.choice(users).user_id,
+                        created_by=random.choice(sample_users).user_id,
                         git_commit=_random_hash()[:8],
                         notes="seed",
                     )

@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://postgres:postgres@db:5432/mlops"
     api_prefix: str = "/api"
     app_name: str = "ml-experiments"
+    jwt_secret: str = "change-me"
+    jwt_algorithm: str = "HS256"
+    jwt_expires_minutes: int = 60
 
 
 settings = Settings()

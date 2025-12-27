@@ -10,3 +10,7 @@ frontend/dist/
 .idea/
 .vscode/
 .DS_Store
+*.log
+*.toc
+*.out
+*.aux

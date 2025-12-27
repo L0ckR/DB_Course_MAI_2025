@@ -4,7 +4,7 @@ This repo does not implement the MLflow tracking API. Below are practical option
 
 ## Option A: scikit-learn → direct API logging (recommended for demo)
 
-Use a small helper to create a run, then push metrics to the API. This keeps audit logging intact via `X-User-Id`.
+Use a small helper to create a run, then push metrics to the API. Authenticate with a bearer token (obtain it from `/api/auth/login`) to keep audit logging intact.
 
 ```python
 import uuid
@@ -12,7 +12,7 @@ import requests
 from sklearn.metrics import accuracy_score
 
 API = "http://localhost:8000/api"
-HEADERS = {"X-User-Id": "<user_uuid>"}
+HEADERS = {"Authorization": "Bearer <access_token>"}
 
 # 1) Create a run
 payload = {

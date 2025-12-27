@@ -2,8 +2,9 @@ const API_BASE = import.meta.env.VITE_API_URL || "/api";
 
 export async function apiFetch(path, options = {}, session = null) {
   const headers = new Headers(options.headers || {});
-  if (session?.user_id) {
-    headers.set("X-User-Id", session.user_id);
+  if (session?.access_token) {
+    const scheme = session.token_type || "Bearer";
+    headers.set("Authorization", `${scheme} ${session.access_token}`);
   }
 
   if (!(options.body instanceof FormData)) {

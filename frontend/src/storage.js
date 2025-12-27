@@ -6,7 +6,11 @@ export function getSession() {
     return null;
   }
   try {
-    return JSON.parse(raw);
+    const session = JSON.parse(raw);
+    if (!session?.access_token) {
+      return null;
+    }
+    return session;
   } catch (err) {
     return null;
   }

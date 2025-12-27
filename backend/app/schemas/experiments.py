@@ -10,7 +10,6 @@ class ExperimentCreate(BaseModel):
     project_id: uuid.UUID
     name: str
     objective: str | None = None
-    created_by: uuid.UUID
 
 
 class ExperimentUpdate(BaseModel):

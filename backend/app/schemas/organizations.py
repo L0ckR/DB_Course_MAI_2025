@@ -9,7 +9,6 @@ from app.schemas.base import ORMBase
 class OrganizationCreate(BaseModel):
     name: str
     description: str | None = None
-    created_by: uuid.UUID
 
 
 class OrganizationUpdate(BaseModel):

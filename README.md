@@ -35,14 +35,18 @@ docker compose exec backend python scripts/seed.py
 
 ## Notes
 
-- Audit triggers use `current_setting('app.user_id', true)`; set `X-User-Id` header in API requests to populate `changed_by`.
+- Audit triggers use `current_setting('app.user_id', true)`; authenticated requests populate `changed_by` automatically.
 - Batch import endpoint: `POST /api/batch-import` (supports `metrics` and `datasets`).
 - Performance demo SQL: `sql/perf_demo.sql`, paste output into `docs/perf_report.md`.
 - Integration notes (MLflow / scikit-learn): `docs/integration.md`.
-- Auth endpoints: `POST /api/auth/register`, `POST /api/auth/login`.
-  Seeded users use the password `demo123`.
+- Coursework report (TeX): `docs/report.tex`.
+- Business queries: `sql/business_queries.sql`.
+- Auth endpoints: `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/token` (OAuth2 password flow for Swagger).
+  Use the `access_token` with `Authorization: Bearer <token>` (Swagger has the Authorize button).
+  Seeded users use the password from `SEED_DEFAULT_PASSWORD`.
   Passwords are hashed with bcrypt via `passlib`.
   Password length is limited to 72 bytes for bcrypt compatibility.
+  Test user credentials come from `SEED_TEST_USER_EMAIL` / `SEED_TEST_USER_PASSWORD`.
 
 ## Frontend
 

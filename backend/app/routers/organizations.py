@@ -4,8 +4,10 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.permissions import require_org_role
+from app.core.security import get_current_user
 from app.db.deps import get_db
-from app.models.models import Organization
+from app.models.models import OrgMember, Organization, User
 from app.schemas.organizations import (
     OrganizationCreate,
     OrganizationRead,
@@ -17,25 +19,53 @@ router = APIRouter(prefix="/orgs", tags=["organizations"])
 
 @router.post("", response_model=OrganizationRead, status_code=status.HTTP_201_CREATED)
 def create_org(
-    org_in: OrganizationCreate, db: Session = Depends(get_db)
+    org_in: OrganizationCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Organization:
-    org = Organization(**org_in.model_dump())
+    org = Organization(**org_in.model_dump(), created_by=current_user.user_id)
     db.add(org)
     db.commit()
     db.refresh(org)
+    db.add(
+        OrgMember(
+            org_id=org.org_id,
+            user_id=current_user.user_id,
+            role="owner",
+            is_active=True,
+        )
+    )
+    db.commit()
     return org
 
 
 @router.get("", response_model=list[OrganizationRead])
 def list_orgs(
-    limit: int = 100, offset: int = 0, db: Session = Depends(get_db)
+    limit: int = 100,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> list[Organization]:
-    orgs = db.scalars(select(Organization).limit(limit).offset(offset)).all()
+    orgs = db.scalars(
+        select(Organization)
+        .join(OrgMember, OrgMember.org_id == Organization.org_id)
+        .where(
+            OrgMember.user_id == current_user.user_id,
+            OrgMember.is_active.is_(True),
+        )
+        .limit(limit)
+        .offset(offset)
+    ).all()
     return orgs
 
 
 @router.get("/{org_id}", response_model=OrganizationRead)
-def get_org(org_id: uuid.UUID, db: Session = Depends(get_db)) -> Organization:
+def get_org(
+    org_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> Organization:
+    require_org_role(db, current_user.user_id, org_id, "viewer")
     org = db.get(Organization, org_id)
     if not org:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Org not found")
@@ -44,8 +74,12 @@ def get_org(org_id: uuid.UUID, db: Session = Depends(get_db)) -> Organization:
 
 @router.put("/{org_id}", response_model=OrganizationRead)
 def update_org(
-    org_id: uuid.UUID, org_in: OrganizationUpdate, db: Session = Depends(get_db)
+    org_id: uuid.UUID,
+    org_in: OrganizationUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> Organization:
+    require_org_role(db, current_user.user_id, org_id, "admin")
     org = db.get(Organization, org_id)
     if not org:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Org not found")
@@ -57,7 +91,12 @@ def update_org(
 
 
 @router.delete("/{org_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_org(org_id: uuid.UUID, db: Session = Depends(get_db)) -> None:
+def delete_org(
+    org_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> None:
+    require_org_role(db, current_user.user_id, org_id, "admin")
     org = db.get(Organization, org_id)
     if not org:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Org not found")

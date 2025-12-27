@@ -4,19 +4,20 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from app.schemas.base import ORMBase
+from app.schemas.enums import ProjectStatus
 
 
 class ProjectCreate(BaseModel):
     org_id: uuid.UUID
     name: str
     description: str | None = None
-    status: str
+    status: ProjectStatus
 
 
 class ProjectUpdate(BaseModel):
     name: str | None = None
     description: str | None = None
-    status: str | None = None
+    status: ProjectStatus | None = None
 
 
 class ProjectRead(ORMBase):
@@ -24,5 +25,5 @@ class ProjectRead(ORMBase):
     org_id: uuid.UUID
     name: str
     description: str | None
-    status: str
+    status: ProjectStatus
     created_at: datetime
